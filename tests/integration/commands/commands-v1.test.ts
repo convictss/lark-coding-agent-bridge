@@ -285,18 +285,34 @@ describe('Bridge command contracts', () => {
         chatMode: 'group',
       }),
     ).resolves.toBe(true);
+    await expect(
+      h.run('/invite auto group', {
+        chatId: 'oc-solo-agent',
+        scope: 'oc-solo-agent',
+        chatMode: 'group',
+      }),
+    ).resolves.toBe(true);
 
     let root = await loadRootConfig(h.controls.configPath);
     expect(root?.profiles.claude?.access.allowedUsers).toContain('ou-alice');
     expect(root?.profiles.claude?.access.admins).toEqual(['ou-admin', 'ou-bob']);
     expect(root?.profiles.claude?.access.allowedChats).toContain('oc-group-1');
+    expect(root?.profiles.claude?.access.autoReplyChats).toContain('oc-solo-agent');
     expect(root?.profiles.claude?.preferences).not.toHaveProperty('access');
 
     await expect(
       h.run('/remove user @Alice', { mentions: [mention('ou-alice', 'Alice')] }),
     ).resolves.toBe(true);
+    await expect(
+      h.run('/remove auto group', {
+        chatId: 'oc-solo-agent',
+        scope: 'oc-solo-agent',
+        chatMode: 'group',
+      }),
+    ).resolves.toBe(true);
     root = await loadRootConfig(h.controls.configPath);
     expect(root?.profiles.claude?.access.allowedUsers).not.toContain('ou-alice');
+    expect(root?.profiles.claude?.access.autoReplyChats).not.toContain('oc-solo-agent');
   });
 
   it('adds every known bot group through /invite all group', async () => {
