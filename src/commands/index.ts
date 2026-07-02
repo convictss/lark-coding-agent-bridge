@@ -1542,6 +1542,7 @@ async function handleInvite(args: string, ctx: CommandContext): Promise<void> {
         '• `/invite user @某人` — 加入允许私聊\n' +
         '• `/invite admin @某人` — 加入管理员\n' +
         '• `/invite group` — 把当前群加入响应群名单\n' +
+        '• `/invite auto group` — 当前群无需 @ bot 也回复\n' +
         '• `/invite all group` — 把 bot 所在的所有群一键加入',
     );
     return;
@@ -1553,6 +1554,25 @@ async function handleInvite(args: string, ctx: CommandContext): Promise<void> {
       return;
     }
     const chatId = ctx.msg.chatId;
+    if (tokens.includes('auto')) {
+      let already = false;
+      await saveAccessConfig(ctx, (current) => {
+        const list = new Set(current.autoReplyChats);
+        already = list.has(chatId);
+        if (!already) list.add(chatId);
+        return {
+          ...current,
+          autoReplyChats: [...list],
+        };
+      });
+      if (already) {
+        await reply(ctx, '✅ 当前群已开启免 @ 回复，无需重复添加。');
+        return;
+      }
+      await reply(ctx, `✅ 当前群（\`${chatId}\`）已开启免 @ 回复。其他群仍照常需要 @ bot。`);
+      await promptGroupMsgScopeIfMissing(ctx);
+      return;
+    }
     let already = false;
     await saveAccessConfig(ctx, (current) => {
       const list = new Set(current.allowedChats);
@@ -1620,7 +1640,8 @@ async function handleRemove(args: string, ctx: CommandContext): Promise<void> {
       '用法：\n' +
         '• `/remove user @某人` — 移出用户白名单\n' +
         '• `/remove admin @某人` — 移出管理员\n' +
-        '• `/remove group` — 把当前群移出响应群名单',
+        '• `/remove group` — 把当前群移出响应群名单\n' +
+        '• `/remove auto group` — 关闭当前群免 @ 回复',
     );
     return;
   }
@@ -1631,6 +1652,24 @@ async function handleRemove(args: string, ctx: CommandContext): Promise<void> {
       return;
     }
     const chatId = ctx.msg.chatId;
+    if (tokens.includes('auto')) {
+      let missing = false;
+      await saveAccessConfig(ctx, (current) => {
+        const list = new Set(current.autoReplyChats);
+        missing = !list.has(chatId);
+        list.delete(chatId);
+        return {
+          ...current,
+          autoReplyChats: [...list],
+        };
+      });
+      if (missing) {
+        await reply(ctx, '✅ 当前群本来就没有开启免 @ 回复，无需移除。');
+        return;
+      }
+      await reply(ctx, '✅ 已关闭当前群免 @ 回复；之后这个群照常需要 @ bot。');
+      return;
+    }
     let missing = false;
     await saveAccessConfig(ctx, (current) => {
       const list = new Set(current.allowedChats);
@@ -1710,6 +1749,7 @@ async function saveAccessConfig(
             allowedUsers: access.allowedUsers,
             allowedChats: access.allowedChats,
             admins: access.admins,
+            autoReplyChats: access.autoReplyChats,
           },
           requireMentionInGroup: access.requireMentionInGroup,
         };
@@ -1731,6 +1771,7 @@ async function saveAccessConfig(
         allowedUsers: access.allowedUsers.length,
         allowedChats: access.allowedChats.length,
         admins: access.admins.length,
+        autoReplyChats: access.autoReplyChats.length,
       });
       return access;
     });
