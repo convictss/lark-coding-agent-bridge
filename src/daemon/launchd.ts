@@ -25,6 +25,8 @@ export interface PlistInputs {
   profile: string;
   /** Root directory for config/profile state. */
   channelHome: string;
+  /** Extra environment values that local agents may need when run by launchd. */
+  extraEnv?: Record<string, string>;
 }
 
 export function buildPlist(inputs: PlistInputs): string {
@@ -62,6 +64,12 @@ export function buildPlist(inputs: PlistInputs): string {
         <string>${escape(inputs.envPath)}</string>
         <key>LARK_CHANNEL_HOME</key>
         <string>${escape(inputs.channelHome)}</string>
+${Object.entries(inputs.extraEnv ?? {})
+  .map(
+    ([key, value]) => `        <key>${escape(key)}</key>
+        <string>${escape(value)}</string>`,
+  )
+  .join('\n')}
     </dict>
 </dict>
 </plist>
@@ -79,11 +87,27 @@ export async function writePlist(profile: string): Promise<void> {
     envPath: process.env.PATH ?? '',
     profile,
     channelHome: paths.rootDir,
+    extraEnv: agentEnvironmentPassthrough(),
   });
   const plistPath = launchAgentPlistPath(profile);
   await mkdir(dirname(plistPath), { recursive: true });
   await mkdir(daemonLogDir(profile), { recursive: true });
   await writeFile(plistPath, content, 'utf8');
+}
+
+function agentEnvironmentPassthrough(): Record<string, string> {
+  const names = [
+    'LITELLM_API_KEY',
+    'OPENAI_API_KEY',
+    'ANTHROPIC_API_KEY',
+    'OPENAI_BASE_URL',
+    'ANTHROPIC_BASE_URL',
+  ];
+  return Object.fromEntries(
+    names
+      .map((name) => [name, process.env[name]] as const)
+      .filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
 }
 
 export function plistExists(profile: string): boolean {
