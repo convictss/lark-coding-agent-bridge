@@ -69,6 +69,28 @@ describe('unified access gates', () => {
     expect(lastMarkdown(channel)).toContain('仅管理员可用');
   });
 
+  it.each(['/new', '/reset'])('denies session reset command %s for non-admin users', async (content) => {
+    const root = await makeRoot();
+    const channel = createFakeChannel();
+    const sessions = new SessionStore(join(root, 'sessions.json'));
+    const workspaces = new WorkspaceStore(join(root, 'workspaces.json'));
+    sessions.set('chat-1', 'session-existing', root);
+    const controls = makeControls({ owner: 'ou_owner', defaultWorkspace: root });
+    const ctx = commandContext({
+      channel,
+      sessions,
+      workspaces,
+      controls,
+      senderId: 'ou_other',
+      content,
+    });
+
+    await tryHandleCommand(ctx);
+
+    expect(sessions.resumeFor('chat-1', root)).toBe('session-existing');
+    expect(lastMarkdown(channel)).toContain('仅管理员可用');
+  });
+
   it('does not apply IM access gates to cloud-doc comment mentions', async () => {
     const root = await makeRoot();
     const calls: string[] = [];

@@ -84,8 +84,9 @@ export async function handleCardAction(deps: CardDispatchDeps): Promise<void> {
 
   const cmd = typeof payload.cmd === 'string' ? payload.cmd : '';
   if (cmd) {
-    if (isSignedBridgeCallback(payload) && !verifyBridgeToken(deps, payload, scope, cmd)) {
-      return;
+    const signedBridgeCallback = isSignedBridgeCallback(payload);
+    if (signedBridgeCallback) {
+      if (!verifyBridgeToken(deps, payload, scope, cmd)) return;
     }
     log.info('cardAction', 'cmd', { cmd, scope });
     const msg = makeFakeMsg(deps.evt, threadId);
@@ -120,7 +121,12 @@ export async function handleCardAction(deps: CardDispatchDeps): Promise<void> {
     const args = composeArgs(sub, payload);
 
     try {
-      const ok = await runCommandHandler(name ?? '', args, ctx);
+      const ok = await runCommandHandler(name ?? '', args, ctx, {
+        // A verified stop token is bound to this operator, scope, active run,
+        // action, and policy fingerprint, so the user may stop their own run
+        // without receiving broader admin command privileges.
+        allowSignedStop: signedBridgeCallback && name === 'stop',
+      });
       if (!ok) log.warn('cardAction', 'unknown', { cmd });
     } catch (err) {
       log.fail('cardAction', err, { cmd });

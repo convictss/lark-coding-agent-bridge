@@ -186,14 +186,19 @@ const handlers: Record<string, Handler> = {
  * owner is always allowed, while empty admin list means no listed admins.
  */
 const ADMIN_COMMANDS = new Set([
+  '/new',
+  '/reset',
   '/account',
   '/config',
+  '/stop',
+  '/timeout',
   '/ps',
   '/exit',
   '/reconnect',
   '/doctor',
   '/cd',
   '/ws',
+  '/resume',
   '/invite',
   '/remove',
 ]);
@@ -235,11 +240,13 @@ export async function runCommandHandler(
   name: string,
   args: string,
   ctx: CommandContext,
+  options: { allowSignedStop?: boolean } = {},
 ): Promise<boolean> {
   const h = handlers[`/${name}`];
   if (!h) return false;
   if (
     isAdminCommand(name) &&
+    !(name === 'stop' && options.allowSignedStop) &&
     !canRunAdminCommand(ctx.controls.profileConfig, ctx.controls, ctx.msg.senderId).ok
   ) {
     log.info('command', 'admin-deny', {
